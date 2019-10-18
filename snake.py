@@ -157,14 +157,11 @@ class MenuOption:
 class Navigation:
     def __init__(self,window, own_snake):
         main_menu = [MenuOption("Singleplayer","Main","Options"),
-                     MenuOption("Multiplayer","Main","Multiplayer"),
                      MenuOption("Settings","Main","Settings"),
                      MenuOption("Info", "Main", "Info"),
                      MenuOption("Exit","Main","EXIT")]
 
-        multiplayer_menu = [MenuOption("Host","Multiplayer","Host"),
-                     MenuOption("Join","Multiplayer","Join"),
-                     MenuOption("Back","Multiplayer","Main")]
+       
 
         options_menu = [MenuOption("Start","Options","Play"),
                      MenuOption("Game Width","Options","change.Game Width"),
@@ -175,7 +172,7 @@ class Navigation:
         settings_menu = [MenuOption("Back","Settings","Main")]
         [settings_menu.insert(0,MenuOption(name,"Settings","set."+name)) for name in possible_settings.keys()]
 
-        self.menus = {"Main":main_menu,"Multiplayer":multiplayer_menu,"Settings":settings_menu,"Options":options_menu}
+        self.menus = {"Main":main_menu,"Settings":settings_menu,"Options":options_menu}
         self.own_snake = own_snake
         self.current_menu = "Main"
         self.current_selection_index = 0
