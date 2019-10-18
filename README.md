@@ -7,7 +7,7 @@ This project was created in only 2 half days, so don't expect anything big.
 A simple snake game that can run in your command prompt.
 
 **Features**
-- Saves highscore
+- Saves highscore, options and settings
 - multiple powerups
 - customizable colors
 
