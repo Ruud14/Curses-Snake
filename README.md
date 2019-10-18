@@ -14,6 +14,7 @@ A simple snake game that can run in your command prompt.
 **How to install?**
 
 - Make sure you have the latest version of python 3 installed.
+- Make sure you have curses for python installed
 - clone the repository
 - when you're in the cloned directory, type `python3 snake.py` in your shell
 - Enjoy :D
