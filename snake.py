@@ -397,7 +397,6 @@ class Match:
         right_border = int(w / 2 + self.width / 2)
         top_border = int(h / 2 - self.height / 2)
         bottom_border = int(h / 2 + self.height / 2)
-        self.window.addstr(10, 10 , str(self.own_snake.speed))
         topleft = [top_border,left_border]
         bottomright = [bottom_border, right_border]
 
