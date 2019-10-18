@@ -35,7 +35,7 @@ A simple snake game that can run in your command prompt.
 **What I learned:**
 - Curses for python.
 
-
+![alt text](https://i.ibb.co/3M0v2G7/snake.jpg)
 
 
 
