@@ -21,11 +21,11 @@ possible_powerups = {"speed":{"kind":"speed","symbol":'+',"duration":5,"color":3
                 "score2":{"kind":"score2","symbol":'2',"duration":0,"color":1, "description":"Increases the snake's score by 2."},
                 "score5":{"kind":"score5","symbol":'5',"duration":0,"color":1, "description":"Increases the snake's score by 5"},
                 "random":{"kind":"random", "description": "Chooses a random powerup from the above."}}
-possible_settings = {"Positive Color":1,"Negative Color":2,"Neutral Color":3,"Selection Color":4}
+possible_settings = {"Positive Color":1,"Negative Color":2,"Neutral Color":3,"Selection Color":4,"Username":""}
 possible_controls = {"Up":"Up-Arrow","Down":"Down-Arrow","Left":"Left-Arrow","Right":"Right-Arrow","Back":"ESC"}
 
 class SavedData:
-    def __init__(self, highscore, selection_color, positive_color, negative_color, neutral_color, standard_game_height, standard_game_width, standard_powerup_amount):
+    def __init__(self, highscore, selection_color, positive_color, negative_color, neutral_color, standard_game_height, standard_game_width, standard_powerup_amount, username):
         self.highscore = highscore
         self.selection_color = selection_color
         self.positive_color = positive_color
@@ -34,6 +34,7 @@ class SavedData:
         self.standard_game_height = standard_game_height
         self.standard_game_width = standard_game_width
         self.standard_powerup_amount = standard_powerup_amount
+        self.username = username
 
 
 # Check if the game already has some saved data.
@@ -49,6 +50,7 @@ if os.path.isfile("saveddata.data"):
     standard_game_height = object.standard_game_height
     standard_game_width = object.standard_game_width
     standard_powerup_amount = object.standard_powerup_amount
+    username = object.username
 else:
     highscore = 0
     selection_color = curses.COLOR_YELLOW
@@ -58,21 +60,22 @@ else:
     standard_game_height = 20
     standard_game_width = 50
     standard_powerup_amount = 5
+    username = ""
 
 
 # Gets user input
 def curses_input(window, height, width, y, x, question):
     window.addstr(y,x-int(len(question)/2), question)
-    new_window = curses.newwin(height, width, y+5, x)
+    new_window = curses.newwin(height, width, y+5, int(x-width/2))
     txtbox = curses.textpad.Textbox(new_window)
-    curses.textpad.rectangle(screen, y+5 - 1, x - 1, y+5 + height, x + width)
+    curses.textpad.rectangle(screen, y+5 - 1, int(x-width/2) - 1, y+5 + height, int(x-width/2) + width)
     screen.refresh()
     return txtbox.edit()
 
 
 # Saves the data to a file.
 def save_data():
-    saveddata = SavedData(highscore,selection_color,positive_color,negative_color,neutral_color,standard_game_height,standard_game_width,standard_powerup_amount)
+    saveddata = SavedData(highscore,selection_color,positive_color,negative_color,neutral_color,standard_game_height,standard_game_width,standard_powerup_amount, username)
     file = open("saveddata.data","wb")
     pickle.dump(saveddata,file)
     file.close()
@@ -122,12 +125,13 @@ class Snake:
             threading.Thread(target=self.wait_duration, args=(powerup.duration, action,)).start()
             powerup.reset()
         elif powerup.kind == "slowness":
-            self.speed -= 5
+            if self.speed > 5:
+                self.speed -= 5
 
-            def action():
-                self.speed += 5
+                def action():
+                    self.speed += 5
 
-            threading.Thread(target=self.wait_duration, args=(powerup.duration, action,)).start()
+                threading.Thread(target=self.wait_duration, args=(powerup.duration, action,)).start()
             powerup.reset()
         elif powerup.kind == "reverse":
             self.reversed_controls = True
@@ -156,15 +160,10 @@ class MenuOption:
 
 class Navigation:
     def __init__(self,window, own_snake):
-        main_menu = [MenuOption("Singleplayer","Main","Options"),
-                     MenuOption("Multiplayer","Main","Multiplayer"),
+        main_menu = [MenuOption("Play","Main","Options"),
                      MenuOption("Settings","Main","Settings"),
                      MenuOption("Info", "Main", "Info"),
                      MenuOption("Exit","Main","EXIT")]
-
-        multiplayer_menu = [MenuOption("Host","Multiplayer","Host"),
-                     MenuOption("Join","Multiplayer","Join"),
-                     MenuOption("Back","Multiplayer","Main")]
 
         options_menu = [MenuOption("Start","Options","Play"),
                      MenuOption("Game Width","Options","change.Game Width"),
@@ -175,21 +174,35 @@ class Navigation:
         settings_menu = [MenuOption("Back","Settings","Main")]
         [settings_menu.insert(0,MenuOption(name,"Settings","set."+name)) for name in possible_settings.keys()]
 
-        self.menus = {"Main":main_menu,"Multiplayer":multiplayer_menu,"Settings":settings_menu,"Options":options_menu}
+        self.menus = {"Main":main_menu,"Settings":settings_menu,"Options":options_menu}
         self.own_snake = own_snake
+        self.window = window
+        # Check if the user already has a username, ask for one if it doesn't.
+        global username
+        while username == "":
+            h, w = self.window.getmaxyx()
+            username = curses_input(self.window, 1, 15, 10, int(w/2), "Enter a username, You can always change this later.")
+
         self.current_menu = "Main"
         self.current_selection_index = 0
-        self.window = window
         self.display_current_menu()
         self.__loop()
 
     def display_current_menu(self):
         global standard_game_width, standard_game_height, standard_powerup_amount
+        h, w = self.window.getmaxyx()
         # Check if the game should exit:
         if self.current_menu == "EXIT":
             global quit_game
             quit_game = True
         elif self.current_menu == "Play":
+
+            # Fix Game size to fit the window
+            if standard_game_height > h-5:
+                standard_game_height = h-5
+            if standard_game_width > w-5:
+                standard_game_width = w-5
+
             # Create and start the match+input loop
             self.in_match = True
             threading.Thread(target=self.__ingame_input_loop).start()
@@ -201,7 +214,6 @@ class Navigation:
             self.display_current_menu()
         else:
             self.window.clear()
-            h, w = self.window.getmaxyx()
             self.window.addstr(2, int(w / 2 - len(self.current_menu) / 2), self.current_menu)
 
             if self.current_menu == "Info":
@@ -243,31 +255,36 @@ class Navigation:
                 variable_name = option.lower().replace(" ","_")
                 line_number = 6
                 x = int(w/2)
-                color = None
-                while not color in range(0,256):
-                    try:
-                        color = int(curses_input(self.window, 1, 4, line_number, x, option+ " - Enter the number of a color from the 256 color palette."))
-                    except:
-                        # Input wasn't a number
-                        pass
+                if option == "Username":
+                    global username
+                    username = curses_input(self.window, 1, 15, 10, int(w/2), "Enter a new username.")
+                    self.window.addstr(line_number + 3, int(x - len("Username changed to "+username) / 2), "Username changed to "+username)
+                else:
+                    color = None
+                    while not color in range(0,256):
+                        try:
+                            color = int(curses_input(self.window, 1, 4, line_number, x, option+ " - Enter the number of a color from the 256 color palette."))
+                        except:
+                            # Input wasn't a number
+                            pass
 
-                # THERE HAS TO BE A BETTER WAY OF DOING THIS. with exec() or something
-                global selection_color, positive_color, negative_color, neutral_color
-                if variable_name == "selection_color":
-                    selection_color = color
-                elif variable_name == "positive_color":
-                    positive_color = color
-                elif variable_name == "negative_color":
-                    negative_color = color
-                elif variable_name == "neutral_color":
-                    neutral_color = color
+                    # THERE HAS TO BE A BETTER WAY OF DOING THIS. with exec() or something
+                    global selection_color, positive_color, negative_color, neutral_color
+                    if variable_name == "selection_color":
+                        selection_color = color
+                    elif variable_name == "positive_color":
+                        positive_color = color
+                    elif variable_name == "negative_color":
+                        negative_color = color
+                    elif variable_name == "neutral_color":
+                        neutral_color = color
 
-                color_number = possible_settings.get(option)
-                curses.init_pair(color_number, color, curses.COLOR_BLACK)
-                self.window.attron(curses.color_pair(color_number))
-                string = option+" Changed to "+ str(color)
-                self.window.addstr(line_number+3, int(x-len(string)/2), string)
-                self.window.attroff(curses.color_pair(color_number))
+                    color_number = possible_settings.get(option)
+                    curses.init_pair(color_number, color, curses.COLOR_BLACK)
+                    self.window.attron(curses.color_pair(color_number))
+                    string = option+" Changed to "+ str(color)
+                    self.window.addstr(line_number+3, int(x-len(string)/2), string)
+                    self.window.attroff(curses.color_pair(color_number))
                 self.window.refresh()
                 time.sleep(2)
                 self.current_menu = "Settings"
