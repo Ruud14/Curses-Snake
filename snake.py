@@ -1,4 +1,3 @@
-from tkinter import messagebox
 from curses import textpad
 import threading
 import random
@@ -11,8 +10,7 @@ import os
 
 # Let op: Curses gebruikt Y,X inplaats van X,Y.
 
-HEIGHT = 20
-WIDTH = 50
+
 DELAY = 500
 snake_display_symbol = 'o'
 quit_game = False
@@ -23,16 +21,19 @@ possible_powerups = {"speed":{"kind":"speed","symbol":'+',"duration":5,"color":3
                 "score2":{"kind":"score2","symbol":'2',"duration":0,"color":1, "description":"Increases the snake's score by 2."},
                 "score5":{"kind":"score5","symbol":'5',"duration":0,"color":1, "description":"Increases the snake's score by 5"},
                 "random":{"kind":"random", "description": "Chooses a random powerup from the above."}}
-possible_options = {"Positive Color":1,"Negative Color":2,"Neutral Color":3,"Selection Color":4}
+possible_settings = {"Positive Color":1,"Negative Color":2,"Neutral Color":3,"Selection Color":4}
 possible_controls = {"Up":"Up-Arrow","Down":"Down-Arrow","Left":"Left-Arrow","Right":"Right-Arrow","Back":"ESC"}
 
 class SavedData:
-    def __init__(self, highscore, selection_color, positive_color, negative_color, neutral_color):
+    def __init__(self, highscore, selection_color, positive_color, negative_color, neutral_color, standard_game_height, standard_game_width, standard_powerup_amount):
         self.highscore = highscore
         self.selection_color = selection_color
         self.positive_color = positive_color
         self.negative_color = negative_color
         self.neutral_color = neutral_color
+        self.standard_game_height = standard_game_height
+        self.standard_game_width = standard_game_width
+        self.standard_powerup_amount = standard_powerup_amount
 
 
 # Check if the game already has some saved data.
@@ -45,12 +46,18 @@ if os.path.isfile("saveddata.data"):
     positive_color = object.positive_color
     negative_color = object.negative_color
     neutral_color = object.neutral_color
+    standard_game_height = object.standard_game_height
+    standard_game_width = object.standard_game_width
+    standard_powerup_amount = object.standard_powerup_amount
 else:
     highscore = 0
     selection_color = curses.COLOR_YELLOW
     positive_color = curses.COLOR_GREEN
     negative_color = curses.COLOR_RED
     neutral_color = curses.COLOR_BLUE
+    standard_game_height = 20
+    standard_game_width = 50
+    standard_powerup_amount = 5
 
 
 # Gets user input
@@ -65,7 +72,7 @@ def curses_input(window, height, width, y, x, question):
 
 # Saves the data to a file.
 def save_data():
-    saveddata = SavedData(highscore,selection_color,positive_color,negative_color,neutral_color)
+    saveddata = SavedData(highscore,selection_color,positive_color,negative_color,neutral_color,standard_game_height,standard_game_width,standard_powerup_amount)
     file = open("saveddata.data","wb")
     pickle.dump(saveddata,file)
     file.close()
@@ -149,9 +156,9 @@ class MenuOption:
 
 class Navigation:
     def __init__(self,window, own_snake):
-        main_menu = [MenuOption("Singleplayer","Main","Play"),
+        main_menu = [MenuOption("Singleplayer","Main","Options"),
                      MenuOption("Multiplayer","Main","Multiplayer"),
-                     MenuOption("Options","Main","Options"),
+                     MenuOption("Settings","Main","Settings"),
                      MenuOption("Info", "Main", "Info"),
                      MenuOption("Exit","Main","EXIT")]
 
@@ -159,10 +166,16 @@ class Navigation:
                      MenuOption("Join","Multiplayer","Join"),
                      MenuOption("Back","Multiplayer","Main")]
 
-        options_menu = [MenuOption("Back","Options","Main")]
-        [options_menu.insert(0,MenuOption(name,"Options","set."+name)) for name in possible_options.keys()]
+        options_menu = [MenuOption("Start","Options","Play"),
+                     MenuOption("Game Width","Options","change.Game Width"),
+                     MenuOption("Game Height","Options","change.Game Height"),
+                     MenuOption("Powerup Amount", "Options", "change.Powerup Amount"),
+                     MenuOption("Back", "Options", "Main")]
 
-        self.menus = {"Main":main_menu,"Multiplayer":multiplayer_menu,"Options":options_menu}
+        settings_menu = [MenuOption("Back","Settings","Main")]
+        [settings_menu.insert(0,MenuOption(name,"Settings","set."+name)) for name in possible_settings.keys()]
+
+        self.menus = {"Main":main_menu,"Multiplayer":multiplayer_menu,"Settings":settings_menu,"Options":options_menu}
         self.own_snake = own_snake
         self.current_menu = "Main"
         self.current_selection_index = 0
@@ -171,6 +184,7 @@ class Navigation:
         self.__loop()
 
     def display_current_menu(self):
+        global standard_game_width, standard_game_height, standard_powerup_amount
         # Check if the game should exit:
         if self.current_menu == "EXIT":
             global quit_game
@@ -179,7 +193,7 @@ class Navigation:
             # Create and start the match+input loop
             self.in_match = True
             threading.Thread(target=self.__ingame_input_loop).start()
-            Match(self.window, HEIGHT, WIDTH, 5 ,[self.own_snake])
+            Match(self.window, standard_game_height, standard_game_width, standard_powerup_amount ,[self.own_snake])
             # When you get here, the match is over
             self.in_match = False  # This will stop the input loop.
             self.own_snake.reset()
@@ -224,7 +238,7 @@ class Navigation:
                             # Disable the color in case it didn't fit the window after attron.
                             self.window.attroff(curses.color_pair(powerup.get("color")))
                             pass
-            elif self.current_menu.startswith("set"):
+            elif self.current_menu.startswith("set."):
                 option = self.current_menu.replace("set.","")
                 variable_name = option.lower().replace(" ","_")
                 line_number = 6
@@ -248,12 +262,50 @@ class Navigation:
                 elif variable_name == "neutral_color":
                     neutral_color = color
 
-                color_number = possible_options.get(option)
+                color_number = possible_settings.get(option)
                 curses.init_pair(color_number, color, curses.COLOR_BLACK)
                 self.window.attron(curses.color_pair(color_number))
                 string = option+" Changed to "+ str(color)
                 self.window.addstr(line_number+3, int(x-len(string)/2), string)
                 self.window.attroff(curses.color_pair(color_number))
+                self.window.refresh()
+                time.sleep(2)
+                self.current_menu = "Settings"
+                self.display_current_menu()
+
+            elif self.current_menu.startswith("change."):
+                option = self.current_menu.replace("change.", "")
+                line_number = 6
+                x = int(w / 2)
+                game_width = -1
+                game_height = -1
+                powerup_amount = -1
+                if option == "Game Width":
+                    while not game_width in range(10,w-5):
+                        try:
+                            game_width = int(curses_input(self.window, 1, 5, line_number, x,option + " - Enter a game width that fits your screen."))
+                        except:
+                            # Input wasn't a number
+                            pass
+                    standard_game_width = game_width
+                elif option == "Game Height":
+                    while not game_height in range(10,h-5):
+                        try:
+                            game_height = int(curses_input(self.window, 1, 5, line_number, x,option + " - Enter a game height that fits your screen."))
+                        except:
+                            # Input wasn't a number
+                            pass
+                    standard_game_height = game_height
+                elif option == "Powerup Amount":
+                    while not powerup_amount in range(0,81):
+                        try:
+                            powerup_amount = int(curses_input(self.window, 1, 5, line_number, x,option + " - Enter the amount of powerups you want (0-80)"))
+                        except:
+                            # Input wasn't a number
+                            pass
+                    standard_powerup_amount = powerup_amount
+                string = option + " Changed!"
+                self.window.addstr(line_number + 3, int(x - len(string) / 2), string)
                 self.window.refresh()
                 time.sleep(2)
                 self.current_menu = "Options"
@@ -479,6 +531,6 @@ if __name__ == '__main__':
     except Exception as e:
         exc_type, exc_obj, exc_tb = sys.exc_info()
         fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        messagebox.showinfo("Exception", str(e)+ str(exc_type)+ str(fname)+ str(exc_tb.tb_lineno))
+        print(str(e)+ str(exc_type)+ str(fname)+ str(exc_tb.tb_lineno))
     curses.endwin()
 
